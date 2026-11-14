@@ -23,12 +23,10 @@ void CST3240Touchscreen::continue_setup_() {
     this->stop_poller();
     this->polling_ = false;
   }
-  if (!this->check_init_())
+  // Ensure we can enter info mode
+  if (!this->setup_check(this->check_init_() && this->write_reg16_(0xD101), LOG_STR("No device found"))) {
     return;
-
-  // Grab some infos from chip...
-  if (!this->write_reg16_(0xD101))
-    return;
+  }
   uint8_t buf[4] = {0};
   if (this->read_reg16_(0xD204, buf, sizeof(buf))) {
     this->chip_id_ = buf[2] + (buf[3] << 8);
@@ -43,7 +41,7 @@ void CST3240Touchscreen::continue_setup_() {
     this->fw_ver_minor_ = buf[2];
     this->fw_build_ = buf[0] + (buf[1] << 8);
     // wrote for ver. 1.0.1
-    ESP_LOGI(TAG, "FW ver. %d.%d.%d", this->fw_ver_major_, this->fw_ver_minor_, this->fw_build_);
+    ESP_LOGD(TAG, "FW ver. %d.%d.%d", this->fw_ver_major_, this->fw_ver_minor_, this->fw_build_);
   }
   // Resolution may be set by ESPHome display, only fill if empty
   if ((this->x_raw_max_ == 0) && this->read_reg16_(0xD1F8, buf, sizeof(buf))) {
