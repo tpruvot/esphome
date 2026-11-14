@@ -9,18 +9,8 @@ ESPHOME_LOG_TAG(TAG, "CST3240");
 // public but not for users at runtime
 void CST3240Touchscreen::setup() {
   if (this->reset_pin_ != nullptr) {
-    this->inited_ = false;
-    // async init time in dev branch of esphome
-#if ESPHOME_VERSION_CODE >= VERSION_CODE(2026, 11, 0)
     pulse_reset(this->reset_pin_, {.high_before_ms = 5, .low_ms = 5});
     this->set_timeout(30, [this] { this->continue_setup_(); });
-#else
-    this->reset_pin_->digital_write(false);
-    delay(8);
-    this->reset_pin_->digital_write(true);
-    delay(22);
-    this->continue_setup_();
-#endif
   } else {
     this->continue_setup_();
   }
