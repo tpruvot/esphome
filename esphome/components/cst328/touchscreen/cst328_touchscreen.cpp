@@ -1,4 +1,5 @@
 #include "cst328_touchscreen.h"
+#include "esphome/core/helpers.h"
 #include "esphome/core/log.h"
 
 namespace esphome::cst328 {
@@ -190,8 +191,10 @@ void CST328Touchscreen::update_touches() {
 
 #ifdef USE_CST328_CST3240
 void CST328Touchscreen::clear_touch_data_() {
-  uint8_t zeros[CST3240_TOUCH_DATA_SIZE]{};
-  if (i2c::ERROR_OK != this->write_register16(CST_REG_TOUCH_INFORMATION, zeros, sizeof(zeros))) {
+  // Built on the stack: write_register16() would heap allocate for a frame this long
+  uint8_t frame[2 + CST3240_TOUCH_DATA_SIZE]{};
+  put_be16(frame, CST_REG_TOUCH_INFORMATION);
+  if (i2c::ERROR_OK != this->write(frame, sizeof(frame))) {
     ESP_LOGW(TAG, "Failed to clear touch data");
   }
 }
