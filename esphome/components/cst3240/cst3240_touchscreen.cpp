@@ -1,31 +1,37 @@
 #include "cst3240_touchscreen.hpp"
+
 #include "esphome/core/log.h"
 
 namespace esphome::cst3240 {
 
 ESPHOME_LOG_TAG(TAG, "CST3240");
 
-void CST3240Touchscreen::reset_() {
+// public but not for users at runtime
+void CST3240Touchscreen::setup() {
   if (this->reset_pin_ != nullptr) {
     this->inited_ = false;
+    // async init time in next branch of esphome
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2026, 11, 0)
+    pulse_reset(this->reset_pin_, {.high_before_ms = 5, .low_ms = 5});
+    this->set_timeout(30, [this] { this->continue_setup_(); });
+#else
     this->reset_pin_->digital_write(false);
     delay(8);
     this->reset_pin_->digital_write(true);
     delay(22);
+    this->continue_setup_();
+#endif
+  } else {
+    this->continue_setup_();
   }
 }
 
-void CST3240Touchscreen::setup() {
-  ESP_LOGCONFIG(TAG, "setup()");
-  // optional, our display shares it
-  if (this->reset_pin_ != nullptr) {
-    this->reset_pin_->setup();
-    this->reset_();
-  }
+void CST3240Touchscreen::continue_setup_() {
   if (this->interrupt_pin_ != nullptr) {
     this->interrupt_pin_->setup();
     this->attach_interrupt_(this->interrupt_pin_, gpio::INTERRUPT_FALLING_EDGE);
     this->stop_poller();
+    this->polling_ = false;
   }
   if (!this->check_init_())
     return;
@@ -108,12 +114,6 @@ void CST3240Touchscreen::update_touches() {
     return;
   }
 
-  if (this->interrupt_pin_ != nullptr && this->interrupt_pin_->digital_read()) {
-    // With TP_INT linked, no loop() required, ignore function call.
-    this->skip_update_ = true;
-    return;
-  }
-
   uint8_t data[(MAX_TOUCH_POINTS * 7)] = {0};
 
   if (!this->read_reg16_(0xD000, data, sizeof(data))) {
@@ -123,8 +123,6 @@ void CST3240Touchscreen::update_touches() {
   }
   // this write could be skipped, but keep it (standby related?)
   this->write_reg16_(0xD000, 0xAB);
-
-  uint8_t fingers = 0;
 
   for (uint8_t i = 0; i < MAX_TOUCH_POINTS; i++) {
     uint8_t offset = i * 7;
@@ -141,21 +139,18 @@ void CST3240Touchscreen::update_touches() {
     if (data[offset] & 0x04) {
       // will set is_touched_
       this->add_raw_touch_position_(tp.id, tp.x_raw, tp.y_raw, tp.z_raw);
-      fingers++;
-      ESP_LOGD(TAG, "%d: event at %d/%d z=%d", tp.id, tp.x_raw, tp.y_raw, tp.z_raw);
+      ESP_LOGVV(TAG, "%d: event at %d/%d z=%d", tp.id, tp.x_raw, tp.y_raw, tp.z_raw);
     } else {
-      last_tp = tp;
       this->is_touched_ = false;
       ESP_LOGD(TAG, "%d: click at %d/%d z=%d", tp.id, tp.x_raw, tp.y_raw, tp.z_raw);
       // Clear CST3240 points buffer to avoid loops in Polling mode (without INT)
-      if (this->interrupt_pin_ == nullptr) {
+      if (this->polling_) {
         this->clear_reg16_(0xD000);
         break;
       }
     }
   }
-  if (fingers)
-    this->send_touches_();
+
 }  // update_touches
 
 }  // namespace esphome::cst3240

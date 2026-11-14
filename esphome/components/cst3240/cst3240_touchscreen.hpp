@@ -12,7 +12,7 @@ namespace esphome::cst3240 {
 // and query the bus for these every 100ms... forever...
 static constexpr uint8_t MAX_TOUCH_POINTS = 3;
 
-class CST3240Touchscreen : public touchscreen::Touchscreen, public i2c::I2CDevice {
+class CST3240Touchscreen final : public touchscreen::Touchscreen, public i2c::I2CDevice {
  public:
   void setup() override;
   void dump_config() override;
@@ -20,11 +20,9 @@ class CST3240Touchscreen : public touchscreen::Touchscreen, public i2c::I2CDevic
   void set_interrupt_pin(InternalGPIOPin *pin) { this->interrupt_pin_ = pin; }
   void set_reset_pin(InternalGPIOPin *pin) { this->reset_pin_ = pin; }
 
-  touchscreen::TouchPoint last_tp{};
-
  protected:
-  void reset_();  // at setup time
   bool check_init_();
+  void continue_setup_();
 
   void update_touches() override;
 
@@ -34,6 +32,7 @@ class CST3240Touchscreen : public touchscreen::Touchscreen, public i2c::I2CDevic
   bool read_reg16_(uint16_t reg, uint8_t *buffer, size_t len);
 
   bool inited_{false};
+  bool polling_{true};
 
   uint16_t chip_id_{};
   uint16_t project_id_{};
