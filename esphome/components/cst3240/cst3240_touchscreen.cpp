@@ -47,6 +47,8 @@ void CST3240Touchscreen::continue_setup_() {
   if ((this->x_raw_max_ == 0) && this->read_reg16_(0xD1F8, buf, sizeof(buf))) {
     this->x_raw_max_ = buf[0] + (buf[1] << 8);
     this->y_raw_max_ = buf[2] + (buf[3] << 8);
+    if (this->swap_x_y_)
+      std::swap(this->x_raw_max_, this->y_raw_max_);
   }
   ESP_LOGD(TAG, "Resolution %d/%d", this->x_raw_max_, this->y_raw_max_);
   this->write_reg16_(0xD109);  // exit 0xD101 debug mode
