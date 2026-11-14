@@ -1,10 +1,10 @@
-#include "cst3240_touchscreen.hpp"
+#include "cst3240_touchscreen.h"
 
 #include "esphome/core/log.h"
 
 namespace esphome::cst3240 {
 
-ESPHOME_LOG_TAG(TAG, "CST3240");
+ESPHOME_LOG_TAG(TAG, "cst3240");
 
 // public but not for users at runtime
 void CST3240Touchscreen::setup() {
@@ -133,7 +133,7 @@ void CST3240Touchscreen::update_touches() {
     tp.y_raw = (data[offset + 2] << 4) | (data[offset + 3] & 0x0F);
     tp.z_raw = (data[offset + 4]);
 
-    // bit 0x04 EVT_PRESS (else EVT_RELEASE)
+    // bits for EVT_PRESS (0 for EVT_RELEASE)
     if (data[offset] & 0x06) {
       // will set is_touched_
       this->add_raw_touch_position_(tp.id, tp.x_raw, tp.y_raw, tp.z_raw);
