@@ -27,12 +27,14 @@ class RegisterBus final : public i2c::I2CBus {
  public:
   std::map<uint16_t, std::vector<uint8_t>> registers;
   uint16_t last_write{0};
+  size_t last_write_size{0};
 
   i2c::ErrorCode write_readv(uint8_t address, const uint8_t *data, size_t size, uint8_t *out,
                              size_t out_size) override {
     if (out_size == 0) {
       if (size >= 2)
         this->last_write = encode_uint16(data[0], data[1]);
+      this->last_write_size = size;
       return i2c::ERROR_OK;
     }
     if (size < 2)
@@ -43,9 +45,10 @@ class RegisterBus final : public i2c::I2CBus {
     return i2c::ERROR_OK;
   }
 
-  void set_finger_count(uint8_t count) {
+  void set_finger_count(uint8_t count, uint8_t sync = 0) {
     std::vector<uint8_t> data(CST328_TOUCH_DATA_SIZE);
     data[CST_REG_FINGER_COUNT_IDX] = count;
+    data[CST_REG_SYNC_IDX] = sync;
     this->registers[CST_REG_TOUCH_INFORMATION] = data;
   }
 };

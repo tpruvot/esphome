@@ -9,11 +9,15 @@ namespace esphome::cst328 {
 
 static const uint8_t CST328_TOUCH_MAX_POINTS = 5;
 static const uint8_t CST328_TOUCH_DATA_SIZE = CST328_TOUCH_MAX_POINTS * 5 + 2;
+static constexpr uint8_t CST3240_TOUCH_MAX_POINTS = 3;
+static constexpr uint8_t CST3240_TOUCH_DATA_SIZE = CST3240_TOUCH_MAX_POINTS * 5 + 2;
+static constexpr uint16_t CST3240_CHIP_ID = 0x3240;
 
 static const uint16_t CST_REG_TOUCH_INFORMATION = 0xD000;
 static const uint16_t CST_REG_TOUCH_FINGER_NUMBER = 0xD005;
 
 static const uint16_t CST_REG_FINGER_COUNT_IDX = CST_REG_TOUCH_FINGER_NUMBER - CST_REG_TOUCH_INFORMATION;
+static constexpr uint16_t CST_REG_SYNC_IDX = CST_REG_FINGER_COUNT_IDX + 1;
 
 static const uint16_t CST_REG_X_Y_RESOLUTION = 0xD1F8;
 static const uint16_t CST_REG_FW_CRC_AND_BOOT_TIME = 0xD1FC;
@@ -36,12 +40,25 @@ class CST328Touchscreen : public touchscreen::Touchscreen, public i2c::I2CDevice
 
   void set_interrupt_pin(InternalGPIOPin *pin) { this->interrupt_pin_ = pin; }
   void set_reset_pin(GPIOPin *pin) { this->reset_pin_ = pin; }
+#ifdef USE_CST328_CST3240
+  void set_cst3240(bool cst3240) { this->cst3240_ = cst3240; }
+#endif
 
  protected:
   void update_touches() override;
   void reset_device_();
   void continue_setup_();
   void update_button_state_(bool state);
+  bool is_cst3240_() const {
+#ifdef USE_CST328_CST3240
+    return this->cst3240_;
+#else
+    return false;
+#endif
+  }
+#ifdef USE_CST328_CST3240
+  void clear_touch_data_();
+#endif
 
   InternalGPIOPin *interrupt_pin_{};
   GPIOPin *reset_pin_{};
@@ -56,6 +73,9 @@ class CST328Touchscreen : public touchscreen::Touchscreen, public i2c::I2CDevice
   uint16_t fw_build_{};
 
   bool setup_complete_{};
+#ifdef USE_CST328_CST3240
+  bool cst3240_{};
+#endif
 };
 
 }  // namespace esphome::cst328

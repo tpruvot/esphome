@@ -54,14 +54,16 @@ void CST328Touchscreen::continue_setup_() {
   uint8_t buf[24]{};
 
   I2C_FAIL_ON_ERROR(this->write_register16(CST_WM_DEBUG_INFO, buf, 0), TAG, "Failed to enter debug/info mode");
-  I2C_FAIL_ON_ERROR(this->read_register16(CST_REG_FW_CRC_AND_BOOT_TIME, buf, 4), TAG,
-                    "Failed to read FW CRC and boot time");
+  if (!this->is_cst3240_()) {
+    I2C_FAIL_ON_ERROR(this->read_register16(CST_REG_FW_CRC_AND_BOOT_TIME, buf, 4), TAG,
+                      "Failed to read FW CRC and boot time");
 
-  uint16_t fw_crc = buf[2] + (buf[3] << 8);
-  if (fw_crc != CST328_FW_CRC) {
-    ESP_LOGE(TAG, "Error: Firmware CRC mismatch, expected 0x%04X but got 0x%04X", CST328_FW_CRC, fw_crc);
-    this->mark_failed();
-    return;
+    uint16_t fw_crc = buf[2] + (buf[3] << 8);
+    if (fw_crc != CST328_FW_CRC) {
+      ESP_LOGE(TAG, "Error: Firmware CRC mismatch, expected 0x%04X but got 0x%04X", CST328_FW_CRC, fw_crc);
+      this->mark_failed();
+      return;
+    }
   }
 
   I2C_FAIL_ON_ERROR(this->read_register16(CST_REG_CHIP_TYPE_AND_PROJECT_ID, buf, 4), TAG,
@@ -70,6 +72,9 @@ void CST328Touchscreen::continue_setup_() {
   this->chip_id_ = buf[2] + (buf[3] << 8);
   this->project_id_ = buf[0] + (buf[1] << 8);
   ESP_LOGD(TAG, "Chip ID %X, project ID %X", this->chip_id_, this->project_id_);
+  if (this->is_cst3240_() && this->chip_id_ != CST3240_CHIP_ID) {
+    ESP_LOGW(TAG, "Unexpected chip ID %X for CST3240", this->chip_id_);
+  }
   I2C_FAIL_ON_ERROR(this->read_register16(CST_REG_FW_REVISION, buf, 4), TAG, "Failed to read FW version");
 
   this->fw_ver_major_ = buf[3];
@@ -92,7 +97,8 @@ void CST328Touchscreen::continue_setup_() {
 
   if (this->interrupt_pin_ != nullptr) {
     this->interrupt_pin_->setup();
-    this->attach_interrupt_(this->interrupt_pin_, gpio::INTERRUPT_FALLING_EDGE);
+    this->attach_interrupt_(this->interrupt_pin_,
+                            this->is_cst3240_() ? gpio::INTERRUPT_RISING_EDGE : gpio::INTERRUPT_FALLING_EDGE);
   }
 
   this->setup_complete_ = true;
@@ -126,18 +132,28 @@ void CST328Touchscreen::update_touches() {
   }
 
   uint8_t touch_data[CST328_TOUCH_DATA_SIZE];
+  const uint8_t max_points = this->is_cst3240_() ? CST3240_TOUCH_MAX_POINTS : CST328_TOUCH_MAX_POINTS;
+  const uint8_t data_size = this->is_cst3240_() ? CST3240_TOUCH_DATA_SIZE : CST328_TOUCH_DATA_SIZE;
 
   this->status_clear_warning();
 
-  if (i2c::ERROR_OK != this->read_register16(CST_REG_TOUCH_INFORMATION, touch_data, CST328_TOUCH_DATA_SIZE)) {
+  if (i2c::ERROR_OK != this->read_register16(CST_REG_TOUCH_INFORMATION, touch_data, data_size)) {
     ESP_LOGW(TAG, "Failed to read touch data");
     this->status_set_warning();
     this->skip_update_ = true;
     return;
   }
 
+#ifdef USE_CST328_CST3240
+  if (this->cst3240_ && touch_data[CST_REG_SYNC_IDX] != CST328_SYNC_BYTE) {
+    this->skip_update_ = true;
+    this->clear_touch_data_();
+    return;
+  }
+#endif
+
   uint8_t touch_cnt = touch_data[CST_REG_FINGER_COUNT_IDX] & 0x0F;
-  if (touch_cnt == 0 || touch_cnt > CST328_TOUCH_MAX_POINTS) {
+  if (touch_cnt == 0 || touch_cnt > max_points) {
     this->update_button_state_(false);
   } else {
     this->update_button_state_(true);
@@ -154,6 +170,14 @@ void CST328Touchscreen::update_touches() {
     }
   }
 
+#ifdef USE_CST328_CST3240
+  // Polling a CST3240 relies on the zeroed block to tell new data from old
+  if (this->cst3240_ && this->interrupt_pin_ == nullptr) {
+    this->clear_touch_data_();
+    return;
+  }
+#endif
+
   bool cleanup_error = false;
   cleanup_error |= !this->write_byte_reg16(CST_REG_TOUCH_FINGER_NUMBER, ZERO_BYTE);
   cleanup_error |= !this->write_byte_reg16(CST_REG_TOUCH_INFORMATION, CST328_SYNC_BYTE);
@@ -162,5 +186,14 @@ void CST328Touchscreen::update_touches() {
     ESP_LOGW(TAG, "Failed to clean up touch registers");
   }
 }
+
+#ifdef USE_CST328_CST3240
+void CST328Touchscreen::clear_touch_data_() {
+  uint8_t zeros[CST3240_TOUCH_DATA_SIZE]{};
+  if (i2c::ERROR_OK != this->write_register16(CST_REG_TOUCH_INFORMATION, zeros, sizeof(zeros))) {
+    ESP_LOGW(TAG, "Failed to clear touch data");
+  }
+}
+#endif
 
 }  // namespace esphome::cst328
