@@ -1,6 +1,6 @@
 import esphome.codegen as cg
 
-CODEOWNERS = ["@latonita", "@tpruvot"]
+CODEOWNERS = ["@latonita"]
 DEPENDENCIES = ["i2c"]
 DOMAIN = "cst328"
 

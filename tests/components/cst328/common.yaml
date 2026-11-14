@@ -16,13 +16,7 @@ touchscreen:
     display: cst328_ssd1306_i2c_display
     interrupt_pin: ${interrupt_pin}
     reset_pin: ${reset_pin}
-  - platform: cst328
-    model: CST3240
-    i2c_id: i2c_bus
-    id: cst3240_touchscreen
-    display: cst328_ssd1306_i2c_display
 
 binary_sensor:
   - platform: cst328
     id: touch_key_cst328
-    cst328_id: cst328_touchscreen
