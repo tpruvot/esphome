@@ -64,11 +64,18 @@ TEST_F(CST3240Test, SetupSkipsTheFirmwareCrc) {
 }
 
 TEST_F(CST3240Test, ReportWithoutTheSyncByteIsSkippedAndCleared) {
-  this->bus_.set_finger_count(1);
+  this->bus_.set_finger_count(1, 0x55);
   this->hub_.update_touches();
   EXPECT_TRUE(this->listener_.states.empty());
   EXPECT_EQ(this->bus_.last_write, CST_REG_TOUCH_INFORMATION);
   EXPECT_EQ(this->bus_.last_write_size, 2u + CST3240_TOUCH_DATA_SIZE);
+}
+
+TEST_F(CST3240Test, IdleBlockIsNotRewritten) {
+  this->bus_.set_finger_count(0);
+  this->bus_.last_write_size = 0;
+  this->hub_.update_touches();
+  EXPECT_EQ(this->bus_.last_write_size, 0u);
 }
 
 TEST_F(CST3240Test, AtMostThreeFingers) {
