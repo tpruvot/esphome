@@ -45,8 +45,11 @@ class RegisterBus final : public i2c::I2CBus {
     return i2c::ERROR_OK;
   }
 
-  void set_finger_count(uint8_t count, uint8_t sync = 0) {
+  /// event 0x06 marks each record pressed; 0 marks it released.
+  void set_finger_count(uint8_t count, uint8_t sync = 0, uint8_t event = 0x06) {
     std::vector<uint8_t> data(CST328_TOUCH_DATA_SIZE);
+    for (size_t i = 0, idx = 0; i < count && idx < data.size(); idx += (i == 0) ? 7 : 5, i++)
+      data[idx] = event;
     data[CST_REG_FINGER_COUNT_IDX] = count;
     data[CST_REG_SYNC_IDX] = sync;
     this->registers[CST_REG_TOUCH_INFORMATION] = data;

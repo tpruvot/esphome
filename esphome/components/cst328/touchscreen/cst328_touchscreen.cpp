@@ -154,22 +154,22 @@ void CST328Touchscreen::update_touches() {
 #endif
 
   uint8_t touch_cnt = touch_data[CST_REG_FINGER_COUNT_IDX] & 0x0F;
-  if (touch_cnt == 0 || touch_cnt > max_points) {
-    this->update_button_state_(false);
-  } else {
-    this->update_button_state_(true);
-
+  bool touched = false;
+  if (touch_cnt != 0 && touch_cnt <= max_points) {
     uint8_t data_idx = 0;
     for (uint8_t i = 0; i < touch_cnt; i++) {
-      uint8_t id = touch_data[data_idx] >> 4;
-      int16_t x = (touch_data[data_idx + 1] << 4) | ((touch_data[data_idx + 3] >> 4) & 0x0F);
-      int16_t y = (touch_data[data_idx + 2] << 4) | (touch_data[data_idx + 3] & 0x0F);
-      int16_t z = touch_data[data_idx + 4];
-
-      this->add_raw_touch_position_(id, x, y, z);
+      const uint8_t *record = touch_data + data_idx;
       data_idx += (i == 0) ? 7 : 5;
+      // A CST3240 also reports the finger it just released, with both press event bits clear
+      if (this->is_cst3240_() && (record[0] & 0x06) == 0)
+        continue;
+      int16_t x = (record[1] << 4) | ((record[3] >> 4) & 0x0F);
+      int16_t y = (record[2] << 4) | (record[3] & 0x0F);
+      this->add_raw_touch_position_(record[0] >> 4, x, y, record[4]);
+      touched = true;
     }
   }
+  this->update_button_state_(touched);
 
 #ifdef USE_CST328_CST3240
   // Polling a CST3240 relies on the zeroed block to tell new data from old

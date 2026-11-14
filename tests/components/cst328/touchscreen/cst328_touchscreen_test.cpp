@@ -78,6 +78,16 @@ TEST_F(CST3240Test, IdleBlockIsNotRewritten) {
   EXPECT_EQ(this->bus_.last_write_size, 0u);
 }
 
+TEST_F(CST3240Test, ReleasedRecordReleasesTheTouch) {
+  this->bus_.set_finger_count(1, 0xAB);
+  this->hub_.update_touches();
+  this->bus_.set_finger_count(1, 0xAB, 0);  // the release report still lists the finger
+  this->hub_.update_touches();
+  this->bus_.set_finger_count(0);
+  this->hub_.update_touches();
+  EXPECT_EQ(this->listener_.states, (std::vector<bool>{true, false}));
+}
+
 TEST_F(CST3240Test, AtMostThreeFingers) {
   this->bus_.set_finger_count(3, 0xAB);
   this->hub_.update_touches();
