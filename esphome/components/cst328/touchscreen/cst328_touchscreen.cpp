@@ -148,8 +148,10 @@ void CST328Touchscreen::update_touches() {
 #ifdef USE_CST328_CST3240
   if (this->cst3240_ && touch_data[CST_REG_SYNC_IDX] != CST328_SYNC_BYTE) {
     this->skip_update_ = true;
-    if (touch_data[CST_REG_SYNC_IDX] != 0)  // an idle block is already clear
+    if (touch_data[CST_REG_SYNC_IDX] != 0) {  // an idle block is already clear
+      ESP_LOGV(TAG, "Skipping report, sync byte 0x%02X", touch_data[CST_REG_SYNC_IDX]);
       this->clear_touch_data_();
+    }
     return;
   }
 #endif
